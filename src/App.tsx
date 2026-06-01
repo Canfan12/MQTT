@@ -10,6 +10,7 @@ const BROKERS = [
     url: "wss://mqtt.ably.io", 
     user: "8L-ACg.rmAq2w",
     pass: "jV_2ZWFPPBYzVJbqCkDhqf-VzaNMRIXoAdie4u1N5pg",
+    clientId: "esp32-web"
   },
   {
     id: 1,
@@ -17,6 +18,7 @@ const BROKERS = [
     url: "wss://kingfisher.lmq.cloudamqp.com/ws",
     user: "ragkazny:ragkazny",
     pass: "BBo6dOCdNAfHw16ttzevwO0BgbeAp-ck",
+    clientId: `web_${Math.random().toString(16).slice(3)}`
   },
   {
     id: 2,
@@ -24,11 +26,12 @@ const BROKERS = [
     url: "wss://pf-ibsgd28puwdn8l7vi5y5.cedalo.cloud/mqtt",
     user: "Web",
     pass: "a",
+    clientId: "WebClient"
   }
 ];
 
 export default function App() {
-  const [activeBrokerId, setActiveBrokerId] = useState(0);
+  const [activeBrokerId, setActiveBrokerId] = useState(1);
   const [client, setClient] = useState<MqttClient | null>(null);
   const [status, setStatus] = useState("Disconnected");
   
@@ -67,7 +70,7 @@ export default function App() {
     const newClient = mqtt.connect(broker.url, {
       username: broker.user,
       password: broker.pass,
-      clientId: `web_${Math.random().toString(16).slice(3)}`,
+      clientId: broker.clientId,
       reconnectPeriod: 5000,
       protocolVersion: 4,
       clean: true,
