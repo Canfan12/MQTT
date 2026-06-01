@@ -68,7 +68,7 @@ export default function App() {
     setStatus(`Connecting to ${broker.name}...`);
     
     if (broker.name === "Ably") {
-      const ably = new Ably.Realtime.Promise({ key: `${broker.user}:${broker.pass}` });
+      const ably = new Ably.Realtime({ key: `${broker.user}:${broker.pass}` });
       
       ably.connection.on('connected', () => {
         setStatus(`Connected to ${broker.name}`);
