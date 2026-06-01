@@ -1,34 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as mqtt from 'mqtt/dist/mqtt.min';
-import { MqttClient } from 'mqtt';
+import mqtt from 'mqtt';
+import type { MqttClient } from 'mqtt';
 import { Mic, MicOff, Power, Thermometer, Droplets, Server, Activity, ArrowRightLeft } from 'lucide-react';
 
 const BROKERS = [
   {
     id: 0,
     name: "Ably",
-    url: "wss://mqtt.ably.io:443", // Ably standard websockets
+    url: "wss://mqtt.ably.io", 
     user: "8L-ACg.rmAq2w",
     pass: "jV_2ZWFPPBYzVJbqCkDhqf-VzaNMRIXoAdie4u1N5pg",
   },
   {
     id: 1,
     name: "CloudAMQP",
-    url: "wss://kingfisher.lmq.cloudamqp.com:443/ws",
+    url: "wss://kingfisher.lmq.cloudamqp.com/ws",
     user: "ragkazny:ragkazny",
     pass: "BBo6dOCdNAfHw16ttzevwO0BgbeAp-ck",
   },
   {
     id: 2,
     name: "Cedalo",
-    url: "wss://pf-ibsgd28puwdn8l7vi5y5.cedalo.cloud:443/mqtt",
+    url: "wss://pf-ibsgd28puwdn8l7vi5y5.cedalo.cloud/mqtt",
     user: "Web",
     pass: "a",
   }
 ];
 
 export default function App() {
-  const [activeBrokerId, setActiveBrokerId] = useState(1);
+  const [activeBrokerId, setActiveBrokerId] = useState(0);
   const [client, setClient] = useState<MqttClient | null>(null);
   const [status, setStatus] = useState("Disconnected");
   
@@ -69,8 +69,9 @@ export default function App() {
       password: broker.pass,
       clientId: `web_${Math.random().toString(16).slice(3)}`,
       reconnectPeriod: 5000,
-      protocol: 'wss',
-      protocolVersion: 4
+      protocolVersion: 4,
+      clean: true,
+      keepalive: 60
     });
 
     newClient.on('connect', () => {
