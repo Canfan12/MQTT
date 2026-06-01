@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import mqtt from 'mqtt';
+import mqtt from 'mqtt/dist/mqtt.js';
 import type { MqttClient } from 'mqtt';
+import * as Ably from 'ably';
 import { Mic, MicOff, Power, Thermometer, Droplets, Server, Activity, ArrowRightLeft } from 'lucide-react';
 
 const BROKERS = [
@@ -10,7 +11,7 @@ const BROKERS = [
     url: "wss://mqtt.ably.io", 
     user: "8L-ACg.rmAq2w",
     pass: "jV_2ZWFPPBYzVJbqCkDhqf-VzaNMRIXoAdie4u1N5pg",
-    clientId: "esp32-web"
+    clientId: `web_${Math.random().toString(16).slice(2)}`
   },
   {
     id: 1,
@@ -18,7 +19,7 @@ const BROKERS = [
     url: "wss://kingfisher.lmq.cloudamqp.com/ws",
     user: "ragkazny:ragkazny",
     pass: "BBo6dOCdNAfHw16ttzevwO0BgbeAp-ck",
-    clientId: `web_${Math.random().toString(16).slice(3)}`
+    clientId: `web_${Math.random().toString(16).slice(2)}`
   },
   {
     id: 2,
@@ -32,7 +33,7 @@ const BROKERS = [
 
 export default function App() {
   const [activeBrokerId, setActiveBrokerId] = useState(1);
-  const [client, setClient] = useState<MqttClient | null>(null);
+  const [client, setClient] = useState<any>(null);
   const [status, setStatus] = useState("Disconnected");
   
   const [temperature, setTemperature] = useState("--");
@@ -54,55 +55,96 @@ export default function App() {
     connectBroker(activeBrokerId);
     return () => {
       if (client) {
-        client.end(true);
+        if (client.end) client.end(true);
       }
     };
   }, []);
 
   const connectBroker = (brokerId: number) => {
     if (client) {
-        client.end(true);
+      if (client.end) client.end(true);
     }
     const broker = BROKERS[brokerId];
     setStatus(`Connecting to ${broker.name}...`);
     
-    // In a browser context, mqtt.connect over WSS handles connection cleanly
-    const newClient = mqtt.connect(broker.url, {
-      username: broker.user,
-      password: broker.pass,
-      clientId: broker.clientId,
-      reconnectPeriod: 5000,
-      protocolVersion: 4,
-      clean: true,
-      keepalive: 60
-    });
+    if (broker.name === "Ably") {
+      const ably = new Ably.Realtime.Promise({ key: `${broker.user}:${broker.pass}` });
+      
+      ably.connection.on('connected', () => {
+        setStatus(`Connected to ${broker.name}`);
+      });
+      
+      ably.connection.on('error', (err) => {
+        console.error('Ably error:', err);
+        setStatus(`Error: ${err.message}`);
+      });
+      
+      ably.connection.on('disconnected', () => {
+        if (status.includes("Connected")) setStatus("Disconnected");
+      });
+      
+      ably.connection.on('closed', () => {
+        if (status.includes("Connected")) setStatus("Disconnected");
+      });
 
-    newClient.on('connect', () => {
-      setStatus(`Connected to ${broker.name}`);
-      newClient.subscribe('sensor:suhu');
-      newClient.subscribe('sensor:kelembaban');
-    });
+      const suhuChannel = ably.channels.get('sensor:suhu');
+      suhuChannel.subscribe((message: any) => {
+        if (message.data) setTemperature(message.data.toString());
+      });
 
-    newClient.on('message', (topic, message) => {
-      const msg = message.toString();
-      if (topic === 'sensor:suhu') setTemperature(msg);
-      if (topic === 'sensor:kelembaban') setHumidity(msg);
-      // Note: Relay state could be tracked if the ESP32 published it, 
-      // but right now ESP32 only listens to 'kontrol:relayX'.
-    });
+      const kelembabanChannel = ably.channels.get('sensor:kelembaban');
+      kelembabanChannel.subscribe((message: any) => {
+        if (message.data) setHumidity(message.data.toString());
+      });
 
-    newClient.on('error', (err) => {
-      console.error('MQTT error: ', err);
-      setStatus(`Error: ${err.message}`);
-    });
-    
-    newClient.on('close', () => {
-       if (status.includes("Connected")) {
-         setStatus("Disconnected");
-       }
-    });
+      const dummyClient = {
+        connected: true,
+        publish: (topic: string, message: string) => {
+          ably.channels.get(topic).publish('message', message);
+        },
+        end: (force: boolean) => {
+          suhuChannel.unsubscribe();
+          kelembabanChannel.unsubscribe();
+          ably.close();
+        }
+      };
+      setClient(dummyClient);
+    } else {
+      const newClient = mqtt.connect(broker.url, {
+        username: broker.user,
+        password: broker.pass,
+        clientId: broker.clientId,
+        reconnectPeriod: 5000,
+        protocolVersion: 4,
+        clean: true,
+        keepalive: 60
+      });
 
-    setClient(newClient);
+      newClient.on('connect', () => {
+        setStatus(`Connected to ${broker.name}`);
+        newClient.subscribe('sensor:suhu');
+        newClient.subscribe('sensor:kelembaban');
+      });
+
+      newClient.on('message', (topic, message) => {
+        const msg = message.toString();
+        if (topic === 'sensor:suhu') setTemperature(msg);
+        if (topic === 'sensor:kelembaban') setHumidity(msg);
+      });
+
+      newClient.on('error', (err) => {
+        console.error('MQTT error: ', err);
+        setStatus(`Error: ${err.message}`);
+      });
+      
+      newClient.on('close', () => {
+         if (status.includes("Connected")) {
+           setStatus("Disconnected");
+         }
+      });
+
+      setClient(newClient);
+    }
   };
 
   const publishTopic = (topic: string, message: string) => {
