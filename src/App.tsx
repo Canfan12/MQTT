@@ -87,14 +87,25 @@ export default function App() {
         if (status.includes("Connected")) setStatus("Disconnected");
       });
 
+      const parseAblyMessage = (data: any) => {
+        if (!data) return "";
+        if (data instanceof ArrayBuffer) {
+          return new TextDecoder().decode(new Uint8Array(data));
+        }
+        if (data.buffer instanceof ArrayBuffer) {
+           return new TextDecoder().decode(data);
+        }
+        return String(data);
+      };
+
       const suhuChannel = ably.channels.get('sensor:suhu');
       suhuChannel.subscribe((message: any) => {
-        if (message.data) setTemperature(message.data.toString());
+        if (message.data) setTemperature(parseAblyMessage(message.data));
       });
 
       const kelembabanChannel = ably.channels.get('sensor:kelembaban');
       kelembabanChannel.subscribe((message: any) => {
-        if (message.data) setHumidity(message.data.toString());
+        if (message.data) setHumidity(parseAblyMessage(message.data));
       });
 
       const dummyClient = {
