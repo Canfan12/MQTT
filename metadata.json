@@ -1,0 +1,6 @@
+{
+  "name": "MQTT Smart Home",
+  "description": "Control relays and monitor sensors via MQTT with voice commands.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
